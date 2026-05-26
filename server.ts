@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { isDisposableEmail } from "./server/disposableEmail";
@@ -92,12 +92,9 @@ async function startServer() {
       console.log(`[DEBUG] Disposable email status: accepted (${email})`);
       console.log("[DEBUG] Validation passed.");
 
-      // Read and validate SMTP environment variables safely
+      // Read and validate Resend environment variables safely
       const missingVars: string[] = [];
-      if (!process.env.SMTP_HOST) missingVars.push("SMTP_HOST");
-      if (!process.env.SMTP_PORT) missingVars.push("SMTP_PORT");
-      if (!process.env.SMTP_USER) missingVars.push("SMTP_USER");
-      if (!process.env.SMTP_PASS) missingVars.push("SMTP_PASS");
+      if (!process.env.RESEND_API_KEY) missingVars.push("RESEND_API_KEY");
       if (!process.env.CONTACT_TO_EMAIL) missingVars.push("CONTACT_TO_EMAIL");
 
       if (missingVars.length > 0) {
@@ -109,26 +106,12 @@ async function startServer() {
         });
       }
 
-      const smtpHost = process.env.SMTP_HOST!;
-      const smtpPort = Number(process.env.SMTP_PORT || 587);
-      const smtpUser = process.env.SMTP_USER!;
-      const smtpPass = process.env.SMTP_PASS!;
+      const resendApiKey = process.env.RESEND_API_KEY!;
       const toEmail = process.env.CONTACT_TO_EMAIL!;
-      const fromEmail = process.env.CONTACT_FROM_EMAIL || smtpUser;
+      const fromEmail = process.env.CONTACT_FROM_EMAIL || "onboarding@resend.dev";
 
-      // Create transport client with strict timeouts
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465, // True for 465, false for 587 / other ports
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
-      });
+      // Instantiate Resend lazily inside the route
+      const resendInstance = new Resend(resendApiKey);
 
       // Prepare date/time
       const formattedDate = new Date().toLocaleString("en-US", { timeZone: "UTC" }) + " (UTC)";
@@ -224,31 +207,37 @@ Cymise Digital Lead Pipeline
         return val.trim();
       }
 
-      console.log("[DEBUG] SMTP send started...");
+      console.log("[DEBUG] Resend send started...");
 
-      // Hard fail-safe promise timeout wrapper around Nodemailer send to guarantee response within 15s
-      const mailPromise = transporter.sendMail({
-        from: `Cymise System Lead <${fromEmail}>`,
+      // Hard fail-safe promise timeout wrapper around Resend send to guarantee response within 15s
+      const mailPromise = resendInstance.emails.send({
+        from: fromEmail,
         to: toEmail,
+        replyTo: email.trim(),
         subject: emailSubject,
         text: emailText,
         html: emailHtml,
       });
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("SMTP message transmission timed out")), 15000);
+        setTimeout(() => reject(new Error("Resend message transmission timed out")), 15000);
       });
 
-      await Promise.race([mailPromise, timeoutPromise]);
+      const result = await Promise.race([mailPromise, timeoutPromise]);
 
-      console.log(`[DEBUG] SMTP send success: Email forwarded cleanly.`);
+      if (result && result.error) {
+        console.error("[DEBUG] Resend API returned error:", result.error);
+        throw new Error(result.error.message || "Resend API returned error");
+      }
+
+      console.log(`[DEBUG] Resend send success: Email forwarded cleanly.`);
       return res.status(200).json({ success: true, message: "Lead registered and email sent successfully." });
 
     } catch (err: any) {
-      console.error("[DEBUG] SMTP send failed:", err.message || err);
+      console.error("[DEBUG] Resend send failed:", err.message || err);
       return res.status(500).json({ 
         success: false, 
-        message: "Email transmission failed. Please email us directly at ahsanzulfiqar655@gmail.com.",
+        message: "Something went wrong. Please email us directly at ahsanzulfiqar655@gmail.com.",
         error: err.message || "Internal Mail transmission service error."
       });
     }
