@@ -1,8 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CymiseLogo } from "./CymiseLogo";
 
-// Only track our extremely light, local asset for critical painting
-const CRITICAL_ASSETS = ["/logo-mark.png"];
+// Only track critical above-the-fold and section media for immediate display
+const CRITICAL_ASSETS = [
+  "/logo-mark.png",
+  "https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/moon_icon.11395d36.png",
+  "https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/p59_1.4659672e.png",
+  "https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/lego_icon-1.703bb594.png",
+  "https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/Group_134-1.2e04f3ce.png",
+  "https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=1200&h=900",
+  "https://motionsites.ai/assets/hero-space-voyage-preview-eECLH3Yc.gif",
+  "https://motionsites.ai/assets/hero-codenest-preview-Cgppc2qV.gif",
+  "https://motionsites.ai/assets/hero-stellar-ai-preview-D3HL6bw1.gif",
+  "https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2Fhf_20260412_055451_e317bf2d-28d4-48cc-86b0-6f72f25b6327.png&w=1280&q=85"
+];
 
 interface PreloaderProps {
   onComplete: () => void;
@@ -18,6 +29,9 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
   const [timePassed, setTimePassed] = useState(false);
   const [windowLoaded, setWindowLoaded] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(0);
+
+  const totalCount = CRITICAL_ASSETS.length;
 
   // Measure prefers-reduced-motion to skip heavy delays if requested
   const prefersReducedMotion = typeof window !== "undefined" 
@@ -30,6 +44,7 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
   const timePassedRef = useRef(timePassed);
   const windowLoadedRef = useRef(windowLoaded);
   const minTimeElapsedRef = useRef(minTimeElapsed);
+  const loadedCountRef = useRef(loadedCount);
 
   useEffect(() => {
     isVideoReadyRef.current = isVideoReady;
@@ -50,6 +65,10 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
   useEffect(() => {
     minTimeElapsedRef.current = minTimeElapsed;
   }, [minTimeElapsed]);
+
+  useEffect(() => {
+    loadedCountRef.current = loadedCount;
+  }, [loadedCount]);
 
   // Window load event listener
   useEffect(() => {
@@ -75,9 +94,9 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
     return () => clearTimeout(minDelayTimer);
   }, [prefersReducedMotion]);
 
-  // Fail-safe timeout (increased to 5500ms for stable content loads on mobile)
+  // Fail-safe timeout (increased to 8500ms for stable content loads on slow mobile)
   useEffect(() => {
-    const maxTimeout = prefersReducedMotion ? 300 : 5500;
+    const maxTimeout = prefersReducedMotion ? 300 : 8500;
     const failSafeTimer = setTimeout(() => {
       setTimePassed(true);
     }, maxTimeout);
@@ -85,41 +104,66 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
     return () => clearTimeout(failSafeTimer);
   }, [prefersReducedMotion]);
 
-  // Asset loading with tight 3.5s absolute timeout
+  // Real-time asset tracker & downloader with decoding support & safety timeouts
   useEffect(() => {
     let active = true;
-    const loadAssets = async () => {
-      // Async image caching
-      const promises = CRITICAL_ASSETS.map((src) => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.src = src;
-          img.onload = () => resolve(true);
-          img.onerror = () => resolve(true);
-        });
-      });
+    const timeoutsMap = new Map<string, any>();
 
-      // Quick font loading support
-      const fontsPromise = (document as any).fonts 
-        ? (document as any).fonts.ready 
-        : Promise.resolve();
-
-      // Maximum fast budget of 3500ms
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, prefersReducedMotion ? 300 : 3500));
-
-      await Promise.race([
-        Promise.all([Promise.all(promises), fontsPromise]),
-        timeoutPromise
-      ]);
-
-      if (active) {
-        setAssetsLoaded(true);
+    const onAssetCompeted = (src: string) => {
+      if (!active) return;
+      if (timeoutsMap.has(src)) {
+        clearTimeout(timeoutsMap.get(src));
+        timeoutsMap.delete(src);
       }
+      setLoadedCount((prev) => prev + 1);
     };
 
-    loadAssets();
-    return () => { active = false; };
-  }, [prefersReducedMotion]);
+    CRITICAL_ASSETS.forEach((src) => {
+      const img = new Image();
+
+      // Individual item failsafe timeout to prevent any loader blockages
+      const handleId = setTimeout(() => {
+        if ((import.meta as any).env?.DEV) {
+          console.warn(`[DEBUG Preloader] Preload timed out for asset: ${src}`);
+        }
+        onAssetCompeted(src);
+      }, 3500);
+      timeoutsMap.set(src, handleId);
+
+      img.onload = () => {
+        if (typeof img.decode === "function") {
+          img.decode()
+            .then(() => onAssetCompeted(src))
+            .catch(() => onAssetCompeted(src));
+        } else {
+          onAssetCompeted(src);
+        }
+      };
+
+      img.onerror = () => {
+        if ((import.meta as any).env?.DEV) {
+          console.error(`[DEBUG Preloader] Preload failed for asset: ${src}`);
+        }
+        onAssetCompeted(src);
+      };
+
+      img.src = src;
+    });
+
+    // Font loading support
+    const fontsPromise = (document as any).fonts 
+      ? (document as any).fonts.ready 
+      : Promise.resolve();
+
+    fontsPromise.then(() => {
+      if (active) setAssetsLoaded(true);
+    });
+
+    return () => {
+      active = false;
+      timeoutsMap.forEach((tid) => clearTimeout(tid));
+    };
+  }, []);
 
   // Organic fast progress ticker using stable interval with Ref reads
   useEffect(() => {
@@ -135,21 +179,21 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
           return 100;
         }
 
-        // Wait for fonts ready (assetsLoadedRef), page layout drawn (windowLoadedRef), video payload buffered (isVideoReadyRef), and min flicker delay elapsed (minTimeElapsedRef)
-        const ready = (assetsLoadedRef.current && windowLoadedRef.current && minTimeElapsedRef.current) || timePassedRef.current;
+        const assetsAllDone = loadedCountRef.current >= totalCount;
+        // Wait for fonts, page layout, critical assets, min delay OR fail-safe timeout
+        const ready = (assetsAllDone && windowLoadedRef.current && minTimeElapsedRef.current) || timePassedRef.current;
 
         if (ready) {
-          // Increment much faster if everything has fetched or client has timed out / reduced motion
           const next = prev + Math.floor(Math.random() * 8) + 5;
           return Math.min(next, 100);
         } else {
-          if (prev < 82) {
-            return prev + Math.floor(Math.random() * 4) + 2;
-          } else if (prev < 95) {
-            // Slower crawl to give video/window extra slice of time to fire complete states
-            return prev + 1;
+          // Progress follows ratio of assets actually loaded, capped strictly below 95%
+          const ratioPercent = Math.floor((loadedCountRef.current / totalCount) * 90);
+          const currentCap = Math.max(15, ratioPercent);
+
+          if (prev < currentCap) {
+            return prev + Math.floor(Math.random() * 2) + 1;
           } else {
-            // Hold at 95% until conditions pass layout readiness check or fail-safe triggers
             return prev;
           }
         }
@@ -157,7 +201,7 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
     }, 45);
 
     return () => clearInterval(interval);
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, totalCount]);
 
   // Transition exit timeline once progress reaches 100%
   useEffect(() => {

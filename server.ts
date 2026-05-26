@@ -92,12 +92,8 @@ async function startServer() {
       console.log("[DEBUG] Validation passed.");
 
       // Read and validate Web3Forms environment variables safely
-      const missingVars: string[] = [];
-      if (!process.env.WEB3FORMS_ACCESS_KEY) missingVars.push("WEB3FORMS_ACCESS_KEY");
-      if (!process.env.CONTACT_TO_EMAIL) missingVars.push("CONTACT_TO_EMAIL");
-
-      if (missingVars.length > 0) {
-        console.error(`[DEBUG] Missing env variables names: ${missingVars.join(", ")}`);
+      if (!process.env.WEB3FORMS_ACCESS_KEY) {
+        console.error("[DEBUG] Missing env variable: WEB3FORMS_ACCESS_KEY");
         return res.status(500).json({
           success: false,
           message: "Email service is not configured yet. Please email us directly at ahsanzulfiqar655@gmail.com.",
@@ -105,7 +101,7 @@ async function startServer() {
         });
       }
 
-      const web3FormsAccessKey = process.env.WEB3FORMS_ACCESS_KEY!;
+      const web3FormsAccessKey = process.env.WEB3FORMS_ACCESS_KEY;
 
       // Prepare date/time
       const formattedDate = new Date().toLocaleString("en-US", { timeZone: "UTC" }) + " (UTC)";

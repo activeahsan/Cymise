@@ -37,7 +37,7 @@ export function AgitateSection() {
           {PAIN_POINTS.map((point, index) => (
             <FadeIn delay={0.1 * (index + 1)} key={index} className="flex flex-col relative group">
               {/* Subtle accent border on hover */}
-              <div className="absolute -inset-6 bg-white/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <div className="absolute -inset-1 sm:-inset-6 bg-white/5 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
               
               <div className="relative z-10 flex flex-col">
                 {point.icon}

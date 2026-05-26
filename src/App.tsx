@@ -205,7 +205,7 @@ function MainAppContent() {
           preload="auto"
           onCanPlayThrough={() => setIsVideoReady(true)}
           onLoadedData={() => setIsVideoReady(true)}
-          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none opacity-40 md:opacity-100 transition-opacity duration-1000"
+          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none opacity-85 md:opacity-100 transition-opacity duration-1000"
         >
           <source src="/ambient-blob.webm" type="video/webm" />
           <source src="/ambient-blob.mp4" type="video/mp4" />
@@ -389,15 +389,18 @@ function MainAppContent() {
 
 // Cleaned up App entry point (no consent wrappers required)
 export default function App() {
-  // Debugging safeguard: identifies elements causing horizontal-overflow
+  // Debugging safeguard: identifies elements causing horizontal-overflow (DEV only)
   useEffect(() => {
+    if (!(import.meta as any).env?.DEV) return;
+
     const checkOverflow = () => {
       const docWidth = document.documentElement.clientWidth;
       const allElements = document.querySelectorAll("*");
       allElements.forEach((el: any) => {
         const rect = el.getBoundingClientRect();
         if (rect.width > docWidth && !el.classList?.contains("w-max") && el.id !== "preloader" && el.tagName !== "HTML" && el.tagName !== "BODY") {
-          console.warn("[DEBUG] Element causing horizontal overflow:", el, `Width: ${rect.width}px`, `DocWidth: ${docWidth}px`);
+          const identifier = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className ? '.' + el.className.toString().split(' ').filter(Boolean).join('.') : ''}`;
+          console.warn(`[DEBUG] Element causing horizontal overflow: ${identifier}`, `Width: ${rect.width}px`, `DocWidth: ${docWidth}px`);
         }
       });
     };
