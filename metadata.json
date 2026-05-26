@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Cymise Hero Section",
+  "description": "A premium, high-converting Hero Section for Cymise B2B Digital Agency. Replicating a high-end minimalist composition with interactive glassmorphic cards and smooth micro-interactions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
