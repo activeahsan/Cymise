@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { Resend } from "resend";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { isDisposableEmail } from "./server/disposableEmail";
@@ -92,10 +91,9 @@ async function startServer() {
       console.log(`[DEBUG] Disposable email status: accepted (${email})`);
       console.log("[DEBUG] Validation passed.");
 
-      // Read and validate Resend environment variables safely
+      // Read and validate Web3Forms environment variables safely
       const missingVars: string[] = [];
-      if (!process.env.RESEND_API_KEY) missingVars.push("RESEND_API_KEY");
-      if (!process.env.CONTACT_TO_EMAIL) missingVars.push("CONTACT_TO_EMAIL");
+      if (!process.env.WEB3FORMS_ACCESS_KEY) missingVars.push("WEB3FORMS_ACCESS_KEY");
 
       if (missingVars.length > 0) {
         console.error(`[DEBUG] Missing env variables names: ${missingVars.join(", ")}`);
@@ -106,135 +104,74 @@ async function startServer() {
         });
       }
 
-      const resendApiKey = process.env.RESEND_API_KEY!;
-      const toEmail = process.env.CONTACT_TO_EMAIL!;
-      const fromEmail = process.env.CONTACT_FROM_EMAIL || "onboarding@resend.dev";
-
-      // Instantiate Resend lazily inside the route
-      const resendInstance = new Resend(resendApiKey);
+      const web3FormsAccessKey = process.env.WEB3FORMS_ACCESS_KEY!;
 
       // Prepare date/time
       const formattedDate = new Date().toLocaleString("en-US", { timeZone: "UTC" }) + " (UTC)";
 
-      // Construct a clean, modern plain-text and HTML email body
-      const emailSubject = `New Cymise Lead — ${name.trim()} (${company ? countryOrOrg(company) : "Individual"})`;
-      
-      const emailText = `
-=== NEW CYMISE LEAD DETAILS ===
-
-Date/Time Submitted: ${formattedDate}
-
-Core Contact Details:
-------------------------------------------
-Name: ${name.trim()}
-Email: ${email.trim()}
-Phone: ${phone ? phone.trim() : "Not Provided"}
-
-Business Context:
-------------------------------------------
-Company/Organization: ${company ? company.trim() : "Not Provided"}
-Website: ${website ? website.trim() : "Not Provided"}
-
-Project Requirements:
-------------------------------------------
-Selected Service: ${service ? service.trim() : "Not Provided"}
-Estimated Budget: ${budget ? budget.trim() : "Not Provided"}
-
-Problem / Inquiry Message:
-------------------------------------------
-${message.trim()}
-
-==========================================
-Cymise Digital Lead Pipeline
-`;
-
-      const emailHtml = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-        <div style="background-color: #000; padding: 24px; text-align: center; border-bottom: 2px solid #7B61FF;">
-          <h2 style="color: #fff; margin: 0; font-size: 24px; tracking-wider: 0.1em; text-transform: uppercase;">Cymise Lead Capture</h2>
-        </div>
-        <div style="padding: 30px; background-color: #fafdff;">
-          <p style="font-size: 14px; color: #666; margin-top: 0;">A new leadership inquiry has been captured. Details are listed below:</p>
-          
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-            <tr style="background-color: #f3f4f6;">
-              <td style="padding: 10px; font-weight: bold; width: 140px; font-size: 13px;">Date Submitted</td>
-              <td style="padding: 10px; font-size: 13px;">${escapeHtml(formattedDate)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Full Name</td>
-              <td style="padding: 10px; font-size: 13px;">${escapeHtml(name.trim())}</td>
-            </tr>
-            <tr style="background-color: #f3f4f6;">
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Email Address</td>
-              <td style="padding: 10px; font-size: 13px;"><a href="mailto:${escapeHtml(email.trim())}">${escapeHtml(email.trim())}</a></td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Phone</td>
-              <td style="padding: 10px; font-size: 13px;">${phone ? escapeHtml(phone.trim()) : "<em>Not Provided</em>"}</td>
-            </tr>
-            <tr style="background-color: #f3f4f6;">
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Company</td>
-              <td style="padding: 10px; font-size: 13px;">${company ? escapeHtml(company.trim()) : "<em>Not Provided</em>"}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Website</td>
-              <td style="padding: 10px; font-size: 13px;">${website ? escapeHtml(website.trim()) : "<em>Not Provided</em>"}</td>
-            </tr>
-            <tr style="background-color: #f3f4f6;">
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Selected Service</td>
-              <td style="padding: 10px; font-size: 13px;">${service ? escapeHtml(service.trim()) : "<em>Not Provided</em>"}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; font-weight: bold; font-size: 13px;">Budget</td>
-              <td style="padding: 10px; font-size: 13px;">${budget ? escapeHtml(budget.trim()) : "<em>Not Provided</em>"}</td>
-            </tr>
-          </table>
-
-          <div style="background-color: #fff; border-left: 4px solid #7B61FF; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px;">
-            <h4 style="margin: 0 0 10px 0; color: #111; font-size: 14px;">Problem Message Details:</h4>
-            <p style="margin: 0; font-size: 13px; font-style: italic; white-space: pre-line; color: #444;">${escapeHtml(message.trim())}</p>
-          </div>
-        </div>
-        <div style="background-color: #f3f4f6; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 11px; color: #888;">
-          Cymise Digital Acquisition Ecosystem &bull; Secure Encrypted Submission
-        </div>
-      </div>
-      `;
-
-      // Helper function for formatting
+      // Core formatting helper function
       function countryOrOrg(val: string) {
         return val.trim();
       }
 
-      console.log("[DEBUG] Resend send started...");
+      // Construct subject for notification email
+      const emailSubject = `New Cymise Lead — ${name.trim()} (${company ? countryOrOrg(company) : "Individual"})`;
 
-      // Hard fail-safe promise timeout wrapper around Resend send to guarantee response within 15s
-      const mailPromise = resendInstance.emails.send({
-        from: fromEmail,
-        to: toEmail,
-        replyTo: email.trim(),
-        subject: emailSubject,
-        text: emailText,
-        html: emailHtml,
-      });
+      console.log("[DEBUG] Web3Forms submission started...");
 
+      const controller = new AbortController();
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Resend message transmission timed out")), 15000);
+        setTimeout(() => {
+          controller.abort();
+          reject(new Error("Web3Forms message transmission timed out"));
+        }, 15000);
       });
 
-      const result = await Promise.race([mailPromise, timeoutPromise]);
+      const fetchPromise = fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          access_key: web3FormsAccessKey,
+          subject: emailSubject,
+          from_name: "Cymise Lead Capture",
+          reply_to: email.trim(),
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone ? phone.trim() : "Not Provided",
+          company: company ? company.trim() : "Not Provided",
+          website: website ? website.trim() : "Not Provided",
+          selected_service: service ? service.trim() : "Not Provided",
+          estimated_budget: budget ? budget.trim() : "Not Provided",
+          message: message.trim(),
+          submitted_time: formattedDate
+        }),
+        signal: controller.signal
+      });
 
-      if (result && result.error) {
-        console.error("[DEBUG] Resend API returned error:", result.error);
-        throw new Error(result.error.message || "Resend API returned error");
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[DEBUG] Web3Forms API non-OK status: ${response.status}`, errorText);
+        throw new Error(`Web3Forms API status code: ${response.status}`);
       }
 
-      console.log(`[DEBUG] Resend send success: Email forwarded cleanly.`);
-      return res.status(200).json({ success: true, message: "Lead registered and email sent successfully." });
+      const responseData = await response.json() as { success: boolean; message?: string };
+      console.log("[DEBUG] Web3Forms API response received.");
+
+      if (!responseData || responseData.success !== true) {
+        console.error("[DEBUG] Web3Forms API reports failure:", responseData);
+        throw new Error(responseData?.message || "Web3Forms API reports failure");
+      }
+
+      console.log(`[DEBUG] Web3Forms submission success.`);
+      return res.status(200).json({ success: true, message: "Lead received successfully." });
 
     } catch (err: any) {
-      console.error("[DEBUG] Resend send failed:", err.message || err);
+      console.error("[DEBUG] Web3Forms submission failed:", err.message || err);
       return res.status(500).json({ 
         success: false, 
         message: "Something went wrong. Please email us directly at ahsanzulfiqar655@gmail.com.",
