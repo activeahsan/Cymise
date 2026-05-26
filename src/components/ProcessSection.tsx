@@ -26,7 +26,7 @@ const PROCESSES = [
 
 export function ProcessSection() {
   return (
-    <section id="process" className="bg-black px-5 sm:px-8 md:px-10 py-20 sm:py-24 md:py-32 relative z-20">
+    <section id="process" className="bg-black px-5 sm:px-8 md:px-10 py-20 sm:py-24 md:py-32 relative z-20 overflow-hidden">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-16 md:gap-24">
         {/* Left Side Sticky Header */}
         <div className="md:w-[40%] flex flex-col items-start relative">

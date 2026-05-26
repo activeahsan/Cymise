@@ -22,7 +22,7 @@ const PAIN_POINTS = [
 
 export function AgitateSection() {
   return (
-    <section id="agitate" className="bg-black px-5 sm:px-8 md:px-10 py-16 sm:py-24 md:py-32 relative z-10">
+    <section id="agitate" className="bg-black px-5 sm:px-8 md:px-10 py-16 sm:py-24 md:py-32 relative z-10 overflow-hidden">
       <div className="max-w-7xl mx-auto">
         <FadeIn delay={0}>
           <h2 className="text-[#D7E2EA] font-display font-bold uppercase text-[clamp(2rem,5vw,60px)] leading-tight tracking-tight mb-4 max-w-4xl">

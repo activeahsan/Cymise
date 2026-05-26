@@ -389,5 +389,26 @@ function MainAppContent() {
 
 // Cleaned up App entry point (no consent wrappers required)
 export default function App() {
+  // Debugging safeguard: identifies elements causing horizontal-overflow
+  useEffect(() => {
+    const checkOverflow = () => {
+      const docWidth = document.documentElement.clientWidth;
+      const allElements = document.querySelectorAll("*");
+      allElements.forEach((el: any) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > docWidth && !el.classList?.contains("w-max") && el.id !== "preloader" && el.tagName !== "HTML" && el.tagName !== "BODY") {
+          console.warn("[DEBUG] Element causing horizontal overflow:", el, `Width: ${rect.width}px`, `DocWidth: ${docWidth}px`);
+        }
+      });
+    };
+    
+    window.addEventListener("resize", checkOverflow);
+    const timer = setTimeout(checkOverflow, 2500);
+    return () => {
+      window.removeEventListener("resize", checkOverflow);
+      clearTimeout(timer);
+    };
+  }, []);
+
   return <MainAppContent />;
 }

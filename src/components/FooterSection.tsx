@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 
 export function FooterSection() {
   return (
-    <footer className="bg-black text-white pt-20 pb-12 px-6 w-full relative z-40 border-t border-white/5">
+    <footer className="bg-black text-white pt-20 pb-12 px-6 w-full relative z-40 border-t border-white/5 overflow-hidden">
       {/* Large Premium Wordmark Branding Block */}
       <div className="max-w-7xl mx-auto flex flex-col items-center justify-center pt-8 pb-14 select-none mb-12">
         <h2 className="font-display font-medium uppercase tracking-[0.25em] text-[#D7E2EA] text-[clamp(2.5rem,10vw,120px)] leading-none text-center">

@@ -252,7 +252,7 @@ export function ContactSection() {
   };
 
   return (
-    <section id="contact" className="bg-black px-5 sm:px-8 md:px-10 py-20 sm:py-24 md:py-32 relative z-35 border-t border-white/5">
+    <section id="contact" className="bg-black px-5 sm:px-8 md:px-10 py-20 sm:py-24 md:py-32 relative z-35 border-t border-white/5 overflow-hidden">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-12 md:gap-24 items-start">
         <div className="md:w-[45%] flex flex-col items-start relative">
           <FadeIn delay={0}>

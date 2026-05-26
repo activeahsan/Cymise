@@ -16,6 +16,8 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
   const [isLoaderFading, setIsLoaderFading] = useState(false);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [timePassed, setTimePassed] = useState(false);
+  const [windowLoaded, setWindowLoaded] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   // Measure prefers-reduced-motion to skip heavy delays if requested
   const prefersReducedMotion = typeof window !== "undefined" 
@@ -26,6 +28,8 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
   const isVideoReadyRef = useRef(isVideoReady);
   const assetsLoadedRef = useRef(assetsLoaded);
   const timePassedRef = useRef(timePassed);
+  const windowLoadedRef = useRef(windowLoaded);
+  const minTimeElapsedRef = useRef(minTimeElapsed);
 
   useEffect(() => {
     isVideoReadyRef.current = isVideoReady;
@@ -39,10 +43,41 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
     timePassedRef.current = timePassed;
   }, [timePassed]);
 
-  // Absolute fail-safe timeout (meets User constraints: Desktop: ~2800ms, Mobile: ~1800ms)
   useEffect(() => {
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-    const maxTimeout = prefersReducedMotion ? 300 : (isMobile ? 1800 : 2800);
+    windowLoadedRef.current = windowLoaded;
+  }, [windowLoaded]);
+
+  useEffect(() => {
+    minTimeElapsedRef.current = minTimeElapsed;
+  }, [minTimeElapsed]);
+
+  // Window load event listener
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (document.readyState === "complete") {
+        setWindowLoaded(true);
+      } else {
+        const handleLoad = () => {
+          setWindowLoaded(true);
+        };
+        window.addEventListener("load", handleLoad);
+        return () => window.removeEventListener("load", handleLoad);
+      }
+    }
+  }, []);
+
+  // Minimum Delay of 1000ms
+  useEffect(() => {
+    const minDelayTimer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, prefersReducedMotion ? 100 : 1000);
+
+    return () => clearTimeout(minDelayTimer);
+  }, [prefersReducedMotion]);
+
+  // Fail-safe timeout (increased to 5500ms for stable content loads on mobile)
+  useEffect(() => {
+    const maxTimeout = prefersReducedMotion ? 300 : 5500;
     const failSafeTimer = setTimeout(() => {
       setTimePassed(true);
     }, maxTimeout);
@@ -50,7 +85,7 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
     return () => clearTimeout(failSafeTimer);
   }, [prefersReducedMotion]);
 
-  // Asset loading with tight 2.5s absolute timeout
+  // Asset loading with tight 3.5s absolute timeout
   useEffect(() => {
     let active = true;
     const loadAssets = async () => {
@@ -69,8 +104,8 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
         ? (document as any).fonts.ready 
         : Promise.resolve();
 
-      // Maximum fast budget of 2500ms
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, prefersReducedMotion ? 300 : 2500));
+      // Maximum fast budget of 3500ms
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, prefersReducedMotion ? 300 : 3500));
 
       await Promise.race([
         Promise.all([Promise.all(promises), fontsPromise]),
@@ -100,20 +135,21 @@ export function Preloader({ onComplete, isVideoReady }: PreloaderProps) {
           return 100;
         }
 
-        const ready = (isVideoReadyRef.current && assetsLoadedRef.current) || timePassedRef.current;
+        // Wait for fonts ready (assetsLoadedRef), page layout drawn (windowLoadedRef), video payload buffered (isVideoReadyRef), and min flicker delay elapsed (minTimeElapsedRef)
+        const ready = (assetsLoadedRef.current && windowLoadedRef.current && minTimeElapsedRef.current) || timePassedRef.current;
 
         if (ready) {
           // Increment much faster if everything has fetched or client has timed out / reduced motion
           const next = prev + Math.floor(Math.random() * 8) + 5;
           return Math.min(next, 100);
         } else {
-          if (prev < 85) {
+          if (prev < 82) {
             return prev + Math.floor(Math.random() * 4) + 2;
-          } else if (prev < 96) {
-            // Slower crawl to give video an extra chunk of time
+          } else if (prev < 95) {
+            // Slower crawl to give video/window extra slice of time to fire complete states
             return prev + 1;
           } else {
-            // Wait at 96% until either assets/video are ready or the absolute fail-safe timeout triggers
+            // Hold at 95% until conditions pass layout readiness check or fail-safe triggers
             return prev;
           }
         }
