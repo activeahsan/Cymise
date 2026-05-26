@@ -140,18 +140,78 @@ export function ContactSection() {
         throw new Error("Invalid response content type from server");
       }
 
-      if (response.ok && data && data.success) {
-        setStatus("success");
-        setFormData({
-          name: "",
-          phone: "",
-          email: "",
-          company: "",
-          website: "",
-          service: "",
-          budget: "",
-          message: ""
-        });
+      if (response.ok && data && data.success && data.validationPassed) {
+        // Backend validation success! Let's submit directly from client-side browser to bypass server blocks.
+        const web3Payload = new URLSearchParams();
+        web3Payload.append("access_key", data.key);
+        web3Payload.append("subject", data.subject);
+        web3Payload.append("from_name", "Cymise Lead Capture");
+        web3Payload.append("replyto", formData.email.trim());
+        web3Payload.append("name", formData.name.trim());
+        web3Payload.append("email", formData.email.trim());
+        web3Payload.append("phone", combinedPhoneString);
+        web3Payload.append("company", formData.company ? formData.company.trim() : "Not Provided");
+        web3Payload.append("website", formData.website ? formData.website.trim() : "Not Provided");
+        web3Payload.append("selected_service", formData.service ? formData.service.trim() : "Not Provided");
+        web3Payload.append("estimated_budget", formData.budget ? formData.budget.trim() : "Not Provided");
+        web3Payload.append("message", formData.message.trim());
+        web3Payload.append("submitted_time", data.submitted_time);
+
+        const clientController = new AbortController();
+        const clientTimeoutId = setTimeout(() => {
+          clientController.abort();
+        }, 15000);
+
+        try {
+          const web3Response = await fetch("https://api.web3forms.com/submit", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Accept": "application/json"
+            },
+            body: web3Payload.toString(),
+            signal: clientController.signal
+          });
+
+          clearTimeout(clientTimeoutId);
+
+          const web3ContentType = web3Response.headers.get("content-type") || "";
+          let web3Data: any = null;
+          if (web3ContentType.includes("application/json")) {
+            web3Data = await web3Response.json();
+          } else {
+            const bodyTxt = await web3Response.text();
+            throw new Error(`Web3Forms non-JSON response: ${bodyTxt.substring(0, 150)}`);
+          }
+
+          if (web3Response.ok && web3Data && web3Data.success) {
+            setStatus("success");
+            setFormData({
+              name: "",
+              phone: "",
+              email: "",
+              company: "",
+              website: "",
+              service: "",
+              budget: "",
+              message: ""
+            });
+          } else {
+            throw new Error(web3Data?.message || "Web3Forms submission was unsuccessful.");
+          }
+        } catch (clientErr: any) {
+          clearTimeout(clientTimeoutId);
+          console.error("Browser-side Web3Forms submission failed:", clientErr);
+          setStatus("error");
+          setErrorText(
+            <span>
+              Something went wrong. Please email us directly at{" "}
+              <a href="mailto:ahsanzulfiqar655@gmail.com" className="underline text-cyan-400 hover:text-cyan-300 font-bold">
+                ahsanzulfiqar655@gmail.com
+              </a>.
+            </span>
+          );
+        }
       } else {
         setStatus("error");
         

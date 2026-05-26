@@ -94,6 +94,7 @@ async function startServer() {
       // Read and validate Web3Forms environment variables safely
       const missingVars: string[] = [];
       if (!process.env.WEB3FORMS_ACCESS_KEY) missingVars.push("WEB3FORMS_ACCESS_KEY");
+      if (!process.env.CONTACT_TO_EMAIL) missingVars.push("CONTACT_TO_EMAIL");
 
       if (missingVars.length > 0) {
         console.error(`[DEBUG] Missing env variables names: ${missingVars.join(", ")}`);
@@ -117,58 +118,14 @@ async function startServer() {
       // Construct subject for notification email
       const emailSubject = `New Cymise Lead — ${name.trim()} (${company ? countryOrOrg(company) : "Individual"})`;
 
-      console.log("[DEBUG] Web3Forms submission started...");
-
-      const controller = new AbortController();
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          controller.abort();
-          reject(new Error("Web3Forms message transmission timed out"));
-        }, 15000);
+      console.log("[DEBUG] Backend validation passed. Returning configuration to frontend for client-side submission.");
+      return res.status(200).json({
+        success: true,
+        validationPassed: true,
+        key: web3FormsAccessKey,
+        subject: emailSubject,
+        submitted_time: formattedDate
       });
-
-      const fetchPromise = fetch("https://api.web3forms.com/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          access_key: web3FormsAccessKey,
-          subject: emailSubject,
-          from_name: "Cymise Lead Capture",
-          reply_to: email.trim(),
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone ? phone.trim() : "Not Provided",
-          company: company ? company.trim() : "Not Provided",
-          website: website ? website.trim() : "Not Provided",
-          selected_service: service ? service.trim() : "Not Provided",
-          estimated_budget: budget ? budget.trim() : "Not Provided",
-          message: message.trim(),
-          submitted_time: formattedDate
-        }),
-        signal: controller.signal
-      });
-
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[DEBUG] Web3Forms API non-OK status: ${response.status}`, errorText);
-        throw new Error(`Web3Forms API status code: ${response.status}`);
-      }
-
-      const responseData = await response.json() as { success: boolean; message?: string };
-      console.log("[DEBUG] Web3Forms API response received.");
-
-      if (!responseData || responseData.success !== true) {
-        console.error("[DEBUG] Web3Forms API reports failure:", responseData);
-        throw new Error(responseData?.message || "Web3Forms API reports failure");
-      }
-
-      console.log(`[DEBUG] Web3Forms submission success.`);
-      return res.status(200).json({ success: true, message: "Lead received successfully." });
 
     } catch (err: any) {
       console.error("[DEBUG] Web3Forms submission failed:", err.message || err);
